@@ -230,6 +230,7 @@ def terrain_correction(
     client_kwargs: dict[str, Any] = {"processes": False},
     seed_step: tuple[int, int] | None = None,
     convert_to_dem_ecef_kwargs: dict[str, Any] = {},
+    to_raster_kwargs: dict[str, Any] | None = None,
 ) -> xr.DataArray:
     """Apply the terrain-correction to sentinel-1 SLC and GRD products.
 
@@ -275,15 +276,6 @@ def terrain_correction(
 
     output_chunks = chunks if chunks is not None else 512
 
-    to_raster_kwargs: dict[str, Any] = {}
-    if enable_dask_distributed:
-        from dask.distributed import Client, Lock
-
-        client = Client(**client_kwargs)
-        to_raster_kwargs["lock"] = Lock("rio")
-        to_raster_kwargs["compute"] = False
-        print(f"Dask distributed dashboard at: {client.dashboard_link}")
-
     logger.info(f"open DEM {dem_urlpath!r}")
 
     dem_raster = scene.open_dem_raster(
@@ -321,7 +313,7 @@ def terrain_correction(
             blockysize=output_chunks,
             compress="ZSTD",
             num_threads="ALL_CPUS",
-            **to_raster_kwargs,
+            **(to_raster_kwargs or {}),
         )
 
         if enable_dask_distributed:
@@ -341,7 +333,7 @@ def terrain_correction(
         blockysize=output_chunks,
         compress="ZSTD",
         num_threads="ALL_CPUS",
-        **to_raster_kwargs,
+        **(to_raster_kwargs or {}),
     )
 
     if enable_dask_distributed:
