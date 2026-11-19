@@ -151,7 +151,7 @@ def simple_dask_map_overlap(
     template: xr.DataArray | None = None,
 ) -> xr.DataArray:
 
-    obj_ovelap = apply_dask_overlap(obj, depth=bound, allow_rechunk=False)
+    obj_ovelap = apply_dask_overlap(obj, depth=bound, allow_rechunk=True)
 
     result_overlap = xr.map_blocks(function, obj_ovelap, kwargs=kwargs)
 
