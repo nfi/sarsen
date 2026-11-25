@@ -182,3 +182,31 @@ def test_terrain_correction_rtc_dask(
     assert isinstance(res, xr.DataArray)
     assert "gamma" in res.attrs["long_name"]
     assert res.notnull().any()
+
+
+def test_terrain_correction_fast_rtc_products(tmpdir: py.path.local) -> None:
+    outs = [str(tmpdir.join("RTC0.tif")), str(tmpdir.join("RTC1.tif"))]
+    products = [
+        sentinel1.Sentinel1SarProduct(
+            str(DATA_PATHS[0]),
+            GROUPS[0],
+            measurement_chunks=2048,
+        )
+        for _ in outs
+    ]
+
+    res = apps.terrain_correction(
+        products,
+        str(DEM_RASTERS[0]),
+        correct_radiometry="gamma_nearest",
+        output_urlpath=outs,
+        chunks=1024,
+        seed_step=(32, 32),
+    )
+
+    assert isinstance(res, list)
+    assert len(res) == 2
+    for geocoded, out in zip(res, outs):
+        assert "gamma" in geocoded.attrs["long_name"]
+        assert os.path.exists(out)
+    xr.testing.assert_identical(res[0], res[1])
