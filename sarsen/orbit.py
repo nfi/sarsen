@@ -19,6 +19,21 @@ def polyder(coefficients: xr.DataArray) -> xr.DataArray:
     return derivative_coefficients
 
 
+def polyval(orbit_time: xr.DataArray, coefficients: xr.DataArray) -> xr.DataArray:
+    # Horner's method like xr.polyval, which puts the dimensions of the coefficients
+    #   last, and numpy is slow on the short "axis" there. The coefficients are the
+    #   first operand to put them first, the values are the same.
+    if orbit_time.dtype.kind != "f":
+        # xr.polyval converts times to numbers
+        return xr.polyval(orbit_time, coefficients)
+    max_deg = coefficients.coords["degree"].max().item()
+    res = coefficients.sel(degree=max_deg, drop=True) + xr.zeros_like(orbit_time)
+    for deg in range(max_deg - 1, -1, -1):
+        res *= orbit_time
+        res += coefficients.sel(degree=deg, drop=True)
+    return res.transpose(*orbit_time.dims, ...)
+
+
 def to_calendar_time(
     elapsed_time: xr.DataArray,
     epoch: np.datetime64 | None = None,
@@ -104,15 +119,15 @@ class OrbitPolyfitInterpolator(datamodel.OrbitInterpolator):
         return to_calendar_time(orbit_time, self.epoch, **kwargs)
 
     def position_from_orbit_time(self, orbit_time: xr.DataArray) -> xr.DataArray:
-        position = xr.polyval(orbit_time, self.position_coefficients)
+        position = polyval(orbit_time, self.position_coefficients)
         return position.rename("position")
 
     def velocity_from_orbit_time(self, orbit_time: xr.DataArray) -> xr.DataArray:
-        velocity = xr.polyval(orbit_time, self.velocity_coefficients)
+        velocity = polyval(orbit_time, self.velocity_coefficients)
         return velocity.rename("velocity")
 
     def acceleration_from_orbit_time(self, orbit_time: xr.DataArray) -> xr.DataArray:
-        velocity = xr.polyval(orbit_time, self.acceleration_coefficients)
+        velocity = polyval(orbit_time, self.acceleration_coefficients)
         return velocity.rename("acceleration")
 
     def position(self, calendar_time: xr.DataArray, **kwargs: Any) -> xr.DataArray:
